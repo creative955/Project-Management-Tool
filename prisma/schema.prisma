@@ -1,0 +1,350 @@
+// OpsHub Prisma schema.
+// Conventions (see docs/ARCHITECTURE.md):
+//   * Every business table has orgId, createdAt, updatedAt, createdById, deletedAt.
+//   * Money is BigInt minor units + currency code.
+//   * Polymorphic links use entityType + entityId.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// Auth.js
+// ============================================================================
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  passwordHash  String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+
+  accounts    Account[]
+  sessions    Session[]
+  memberships Member[]
+}
+
+model Account {
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([provider, providerAccountId])
+}
+
+model Session {
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@id([identifier, token])
+}
+
+// ============================================================================
+// Platform: organisations, membership, RBAC
+// ============================================================================
+
+model Organization {
+  id                   String    @id @default(cuid())
+  name                 String
+  slug                 String    @unique
+  logoUrl              String?
+  country              String    @default("IN") // ISO 3166-1 alpha-2
+  baseCurrency         String    @default("INR") // ISO 4217
+  timezone             String    @default("Asia/Kolkata") // IANA
+  fiscalYearStartMonth Int       @default(4) // 1 = January
+  weekStartsOn         Int       @default(1) // 0 = Sunday
+  workingDays          Int[]     @default([1, 2, 3, 4, 5]) // 0 = Sunday … 6 = Saturday
+  workdayStartMinutes  Int       @default(570) // minutes after midnight, 09:30
+  workdayEndMinutes    Int       @default(1110) // 18:30
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  createdById          String?
+  deletedAt            DateTime?
+
+  members      Member[]
+  roles        Role[]
+  permissions  Permission[]
+  fieldAccess  RoleFieldAccess[]
+  invitations  Invitation[]
+  locations    Location[]
+  departments  Department[]
+  designations Designation[]
+  grades       Grade[]
+  auditLogs    AuditLog[]
+}
+
+enum PermissionScope {
+  NONE
+  OWN
+  TEAM
+  DEPARTMENT
+  ALL
+}
+
+enum FieldGroup {
+  SALARY
+  BANK
+  TAX
+  PERSONAL
+}
+
+enum FieldAccess {
+  HIDDEN
+  MASKED
+  VIEW
+  EDIT
+}
+
+model Role {
+  id          String    @id @default(cuid())
+  orgId       String
+  key         String // stable identifier, e.g. "owner", "hr_manager", or "custom_<slug>"
+  name        String
+  description String?
+  isSystem    Boolean   @default(false)
+  isLocked    Boolean   @default(false) // Owner cannot be edited
+  sortOrder   Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  createdById String?
+  deletedAt   DateTime?
+
+  org         Organization      @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  permissions Permission[]
+  fieldAccess RoleFieldAccess[]
+  members     Member[]
+  invitations Invitation[]
+
+  @@unique([orgId, key])
+  @@index([orgId])
+}
+
+model Permission {
+  id          String          @id @default(cuid())
+  orgId       String
+  roleId      String
+  module      String // see src/server/rbac/catalog.ts
+  action      String
+  scope       PermissionScope
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  createdById String?
+  deletedAt   DateTime?
+
+  org  Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  role Role         @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, module, action])
+  @@index([orgId])
+}
+
+model RoleFieldAccess {
+  id          String      @id @default(cuid())
+  orgId       String
+  roleId      String
+  fieldGroup  FieldGroup
+  access      FieldAccess
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  createdById String?
+  deletedAt   DateTime?
+
+  org  Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  role Role         @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, fieldGroup])
+  @@index([orgId])
+}
+
+enum MemberStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+model Member {
+  id            String       @id @default(cuid())
+  orgId         String
+  userId        String
+  roleId        String
+  status        MemberStatus @default(ACTIVE)
+  title         String?
+  departmentId  String?
+  designationId String?
+  locationId    String?
+  gradeId       String?
+  managerId     String? // reporting line; drives TEAM scope
+  joinedAt      DateTime     @default(now())
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  createdById   String?
+  deletedAt     DateTime?
+
+  org         Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role        Role         @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  department  Department?  @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  designation Designation? @relation(fields: [designationId], references: [id], onDelete: SetNull)
+  location    Location?    @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  grade       Grade?       @relation(fields: [gradeId], references: [id], onDelete: SetNull)
+  manager     Member?      @relation("Reporting", fields: [managerId], references: [id], onDelete: SetNull)
+  reports     Member[]     @relation("Reporting")
+
+  @@unique([orgId, userId])
+  @@index([orgId, status])
+  @@index([managerId])
+}
+
+model Invitation {
+  id          String    @id @default(cuid())
+  orgId       String
+  email       String
+  roleId      String
+  tokenHash   String    @unique // sha256 of the token; raw token only ever shown once
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  createdById String?
+  deletedAt   DateTime?
+
+  org  Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  role Role         @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, email])
+}
+
+// ============================================================================
+// Platform: organisation masters
+// ============================================================================
+
+model Location {
+  id           String    @id @default(cuid())
+  orgId        String
+  name         String
+  code         String
+  country      String // ISO 3166-1 alpha-2
+  city         String?
+  timezone     String
+  currency     String // ISO 4217 (local payroll currency)
+  isHeadOffice Boolean   @default(false)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  createdById  String?
+  deletedAt    DateTime?
+
+  org     Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  members Member[]
+
+  @@unique([orgId, code])
+  @@index([orgId])
+}
+
+model Department {
+  id          String    @id @default(cuid())
+  orgId       String
+  name        String
+  code        String
+  parentId    String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  createdById String?
+  deletedAt   DateTime?
+
+  org      Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  parent   Department?  @relation("DepartmentTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children Department[] @relation("DepartmentTree")
+  members  Member[]
+
+  @@unique([orgId, code])
+  @@index([orgId])
+}
+
+model Designation {
+  id          String    @id @default(cuid())
+  orgId       String
+  name        String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  createdById String?
+  deletedAt   DateTime?
+
+  org     Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  members Member[]
+
+  @@unique([orgId, name])
+  @@index([orgId])
+}
+
+model Grade {
+  id          String    @id @default(cuid())
+  orgId       String
+  code        String
+  name        String
+  rank        Int // higher = more senior
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  createdById String?
+  deletedAt   DateTime?
+
+  org     Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  members Member[]
+
+  @@unique([orgId, code])
+  @@index([orgId])
+}
+
+// ============================================================================
+// Platform: audit log (append-only; no updatedAt / deletedAt by design)
+// ============================================================================
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  orgId      String
+  actorId    String? // user id; null for system jobs
+  action     String // e.g. "member.role_changed"
+  entityType String
+  entityId   String?
+  changes    Json? // { field: { from, to } }
+  metadata   Json?
+  ip         String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, createdAt])
+  @@index([orgId, entityType, entityId])
+}

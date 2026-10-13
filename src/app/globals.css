@@ -1,0 +1,181 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Brand tokens. Ink #0B0B0B on base #F7F8F5, accent #B6FF3B.
+ * Accent is a background colour only (with ink text) on light surfaces —
+ * green text on light surfaces fails WCAG AA.
+ */
+:root {
+  --radius: 0.5rem;
+
+  --ink: #0b0b0b;
+  --base: #f7f8f5;
+  --brand: #b6ff3b;
+  --brand-hover: #a6f02a;
+  --brand-foreground: #0b0b0b;
+
+  --background: var(--base);
+  --foreground: var(--ink);
+  --card: #ffffff;
+  --card-foreground: var(--ink);
+  --popover: #ffffff;
+  --popover-foreground: var(--ink);
+  --primary: var(--brand);
+  --primary-foreground: var(--brand-foreground);
+  --secondary: #eceee8;
+  --secondary-foreground: var(--ink);
+  --muted: #eef0ea;
+  --muted-foreground: #565c52;
+  --accent: #e8ebe2;
+  --accent-foreground: var(--ink);
+  --destructive: #c62828;
+  --destructive-foreground: #ffffff;
+  --success: #1f7a3a;
+  --warning: #9a5b00;
+  --border: #dde1d7;
+  --input: #d3d8cc;
+  --ring: var(--brand);
+  --focus-outline: var(--ink);
+
+  --chart-1: #b6ff3b;
+  --chart-2: #0b0b0b;
+  --chart-3: #5b8def;
+  --chart-4: #f2994a;
+  --chart-5: #9b51e0;
+
+  --sidebar: #eff1eb;
+  --sidebar-foreground: var(--ink);
+  --sidebar-primary: var(--brand);
+  --sidebar-primary-foreground: var(--brand-foreground);
+  --sidebar-accent: #e2e6db;
+  --sidebar-accent-foreground: var(--ink);
+  --sidebar-border: #dde1d7;
+  --sidebar-ring: var(--brand);
+
+  --sidebar-width: 15.5rem;
+  --sidebar-width-collapsed: 3.5rem;
+  --topbar-height: 3rem;
+  --nav-item-height: 2rem;
+  --page-padding: 1.5rem;
+}
+
+.dark {
+  --background: #0b0b0b;
+  --foreground: #f2f3ef;
+  --card: #141513;
+  --card-foreground: #f2f3ef;
+  --popover: #161715;
+  --popover-foreground: #f2f3ef;
+  --primary: var(--brand);
+  --primary-foreground: var(--brand-foreground);
+  --secondary: #1e201c;
+  --secondary-foreground: #f2f3ef;
+  --muted: #1a1c18;
+  --muted-foreground: #a3a99d;
+  --accent: #23261f;
+  --accent-foreground: #f2f3ef;
+  --destructive: #ef5350;
+  --destructive-foreground: #0b0b0b;
+  --success: #6fdc8c;
+  --warning: #f2c14e;
+  --border: #2a2d27;
+  --input: #34382f;
+  --ring: var(--brand);
+  --focus-outline: var(--brand);
+
+  --chart-2: #f2f3ef;
+
+  --sidebar: #111210;
+  --sidebar-foreground: #f2f3ef;
+  --sidebar-accent: #1f221c;
+  --sidebar-accent-foreground: #f2f3ef;
+  --sidebar-border: #24271f;
+}
+
+html[data-density="compact"] {
+  font-size: 14px;
+  --nav-item-height: 1.75rem;
+  --page-padding: 1rem;
+  --topbar-height: 2.75rem;
+}
+
+@theme inline {
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-brand: var(--brand);
+  --color-brand-hover: var(--brand-hover);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-ink: var(--ink);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "cv11", "ss01";
+  }
+}
+
+/*
+ * Unlayered on purpose so it wins over `outline-none` utilities: the green ring
+ * alone is ~1.1:1 against the light base, so an ink outline guarantees a visible
+ * focus indicator (WCAG 2.4.7 / 1.4.11). In dark mode the outline is green.
+ */
+:focus-visible {
+  outline: 2px solid var(--focus-outline);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
