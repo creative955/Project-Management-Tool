@@ -1,6 +1,7 @@
 "use server";
 
 import { AuthError } from "next-auth";
+import { redirect } from "next/navigation";
 import { z } from "zod";
 import { safeCallbackUrl } from "@/lib/safe-redirect";
 import { signIn } from "@/server/auth";
@@ -24,6 +25,24 @@ const signupSchema = z.object({
   password: passwordSchema,
 });
 
+/**
+ * Signs in without letting Auth.js build an absolute redirect URL: behind a proxy
+ * the server's host can differ from the browser's, so we redirect to a relative
+ * path ourselves once the session cookie is set.
+ */
+async function signInWithPassword(email: string, password: string): Promise<"ok" | "invalid" | "error"> {
+  try {
+    const url = await signIn("credentials", { email, password, redirect: false });
+    if (typeof url === "string" && url.includes("error=")) {
+      return url.includes("CredentialsSignin") ? "invalid" : "error";
+    }
+    return "ok";
+  } catch (error) {
+    if (error instanceof AuthError) return error.type === "CredentialsSignin" ? "invalid" : "error";
+    throw error;
+  }
+}
+
 export async function loginAction(_prev: AuthFormState, formData: FormData): Promise<AuthFormState> {
   const raw = Object.fromEntries(formData);
   const parsed = loginSchema.safeParse(raw);
@@ -31,22 +50,14 @@ export async function loginAction(_prev: AuthFormState, formData: FormData): Pro
   if (!parsed.success) {
     return { fieldErrors: z.flattenError(parsed.error).fieldErrors, values };
   }
-  try {
-    await signIn("credentials", {
-      email: parsed.data.email,
-      password: parsed.data.password,
-      redirectTo: safeCallbackUrl(raw.callbackUrl),
-    });
-    return {};
-  } catch (error) {
-    if (error instanceof AuthError) {
-      return {
-        error: error.type === "CredentialsSignin" ? "Incorrect email or password." : "Sign-in failed. Please try again.",
-        values,
-      };
-    }
-    throw error;
+  const result = await signInWithPassword(parsed.data.email, parsed.data.password);
+  if (result !== "ok") {
+    return {
+      error: result === "invalid" ? "Incorrect email or password." : "Sign-in failed. Please try again.",
+      values,
+    };
   }
+  redirect(safeCallbackUrl(raw.callbackUrl));
 }
 
 export async function signupAction(_prev: AuthFormState, formData: FormData): Promise<AuthFormState> {
@@ -70,17 +81,9 @@ export async function signupAction(_prev: AuthFormState, formData: FormData): Pr
     },
   });
 
-  try {
-    await signIn("credentials", {
-      email: parsed.data.email,
-      password: parsed.data.password,
-      redirectTo: safeCallbackUrl(raw.callbackUrl, "/onboarding"),
-    });
-    return {};
-  } catch (error) {
-    if (error instanceof AuthError) return { error: "Account created, but sign-in failed. Please log in.", values };
-    throw error;
-  }
+  const result = await signInWithPassword(parsed.data.email, parsed.data.password);
+  if (result !== "ok") return { error: "Account created, but sign-in failed. Please log in.", values };
+  redirect(safeCallbackUrl(raw.callbackUrl, "/onboarding"));
 }
 
 export async function googleSignInAction(formData: FormData): Promise<void> {
